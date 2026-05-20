@@ -1,0 +1,104 @@
+defmodule ClienteJugador.MenuCuenta do
+  @moduledoc "Menú de gestión de cuenta del jugador."
+
+  alias ClienteJugador.{Entrada, Cliente, UI}
+
+  def iniciar(sesion) do
+    UI.titulo("Mi cuenta")
+    UI.opcion(1, "Historial de compras")
+    UI.opcion(2, "Devolver una compra")
+    UI.opcion(3, "Premios obtenidos")
+    UI.opcion(4, "Balance personal")
+    UI.opcion(5, "Notificaciones")
+    UI.opcion(6, "Volver al menú principal")
+
+    case Entrada.leer_opcion("Opción: ", [1, 2, 3, 4, 5, 6]) do
+      1 -> historial(sesion); iniciar(sesion)
+      2 -> devolver(sesion); iniciar(sesion)
+      3 -> premios(sesion); iniciar(sesion)
+      4 -> balance(sesion); iniciar(sesion)
+      5 -> notificaciones(sesion); iniciar(sesion)
+      6 -> :ok
+    end
+  end
+
+  defp historial(sesion) do
+    UI.titulo("Historial de compras")
+
+    case Cliente.enviar_solicitud(:historial_compras, %{jugador_id: sesion.id}) do
+      {:ok, %{compras: [], total_gastado: _}} ->
+        UI.aviso("No tienes compras registradas.")
+
+      {:ok, %{compras: compras, total_gastado: total}} ->
+        Enum.each(compras, fn c ->
+          UI.info("• [#{c[:id]}] #{c[:sorteo]} — #{c[:tipo]}, Nº#{c[:numero]} — $#{c[:valor]} (#{c[:fecha]})")
+        end)
+        UI.info("")
+        UI.exito("Total gastado: $#{total}")
+
+      {:error, motivo} -> UI.error("Error: #{inspect(motivo)}")
+    end
+  end
+
+  defp devolver(sesion) do
+    UI.titulo("Devolver compra")
+    id = Entrada.leer_entero("ID de la compra a devolver: ")
+
+    case Cliente.enviar_solicitud(:devolver_compra, %{jugador_id: sesion.id, compra_id: id}) do
+      {:ok, monto} ->
+        UI.exito("Devolución exitosa. Se reintegraron $#{monto}.")
+
+      {:error, :sorteo_ya_jugado} ->
+        UI.error("No se puede devolver: el sorteo ya se realizó.")
+
+      {:error, :no_encontrada} ->
+        UI.error("No existe una compra con ese ID.")
+
+      {:error, motivo} ->
+        UI.error("No se pudo devolver: #{inspect(motivo)}")
+    end
+  end
+
+  defp premios(sesion) do
+    UI.titulo("Premios obtenidos")
+
+    case Cliente.enviar_solicitud(:premios_obtenidos, %{jugador_id: sesion.id}) do
+      {:ok, []} -> UI.aviso("Aún no has ganado premios.")
+      {:ok, premios} when is_list(premios) ->
+        Enum.each(premios, fn p ->
+          UI.info("• #{p[:sorteo]} — #{p[:premio]} — $#{p[:valor]}")
+        end)
+      {:error, motivo} -> UI.error("Error: #{inspect(motivo)}")
+    end
+  end
+
+  defp balance(sesion) do
+    UI.titulo("Balance personal")
+
+    case Cliente.enviar_solicitud(:balance_personal, %{jugador_id: sesion.id}) do
+      {:ok, %{gastado: g, ganado: ga, balance: b}} ->
+        UI.info("Total gastado: $#{g}")
+        UI.info("Total ganado:  $#{ga}")
+        if b >= 0 do
+          UI.exito("Balance: +$#{b}")
+        else
+          UI.error("Balance: -$#{abs(b)}")
+        end
+
+      {:error, motivo} -> UI.error("Error: #{inspect(motivo)}")
+    end
+  end
+
+  defp notificaciones(sesion) do
+    UI.titulo("Notificaciones")
+
+    case Cliente.enviar_solicitud(:notificaciones, %{jugador_id: sesion.id}) do
+      {:ok, []} -> UI.aviso("No tienes notificaciones.")
+      {:ok, notifs} when is_list(notifs) ->
+        Enum.each(notifs, fn n ->
+          UI.info("[#{n[:fecha]}] #{n[:mensaje]}")
+        end)
+      {:error, motivo} -> UI.error("Error: #{inspect(motivo)}")
+    end
+  end
+end
