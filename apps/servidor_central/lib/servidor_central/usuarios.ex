@@ -1,6 +1,7 @@
 defmodule ServidorCentral.Usuario do
   @roles_permitidos ["ADMINISTRADOR", "JUGADOR"]
   use Ecto.Schema
+  import Ecto.Changeset
 
   schema "usuarios" do
     field(:cedula, :string)
@@ -24,7 +25,7 @@ defmodule ServidorCentral.Usuario do
   Changeset para la creación y validacion de usuarios
   """
 
-  def changeset(usuario, params \\ %{}) do
+  def changeset_registro(usuario, params \\ %{}) do
     usuario
     |> Ecto.Changeset.cast(params, [
       :cedula,
@@ -53,6 +54,21 @@ defmodule ServidorCentral.Usuario do
     |> Ecto.Changeset.unique_constraint(:email)
     |> Ecto.Changeset.unique_constraint(:cedula)
     |> put_pass_hash()
+  end
+
+  def changeset_actualizacion(usuario, params \\ %{}) do
+    usuario
+    |> Ecto.Changeset.cast(params, [
+      :first_name,
+      :second_name,
+      :first_lastname,
+      :second_lastname,
+      :email
+    ])
+    |> validate_format(:email, ~r/^[^\s]+@[^\s]+$/,
+      message: "debe tener un formato de correo válido"
+    )
+    |> unique_constraint(:email)
   end
 
   defp put_pass_hash(changeset) do

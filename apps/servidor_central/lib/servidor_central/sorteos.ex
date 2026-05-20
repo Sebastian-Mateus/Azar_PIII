@@ -1,5 +1,5 @@
 defmodule ServidorCentral.Sorteo do
-  @estados ["PENDIENTE", "JUGADO", "ABIERTO"]
+  @estados ["PENDIENTE", "ABIERTO", "CERRADO"]
   use Ecto.Schema
 
   schema "sorteos" do
