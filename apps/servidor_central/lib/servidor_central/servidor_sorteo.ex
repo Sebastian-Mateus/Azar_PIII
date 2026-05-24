@@ -37,6 +37,10 @@ defmodule ServidorCentral.ServidorSorteo do
     )
   end
 
+  def comprar_completo(sorteo_id, jugador_id, numero_billete) do
+    GenServer.call(via_tuple(sorteo_id), {:comprar_completo, jugador_id, numero_billete})
+  end
+
   @doc """
   Solicita la lista de números disponibles del sorteo.
   """
@@ -81,6 +85,12 @@ defmodule ServidorCentral.ServidorSorteo do
     resultado =
       Compras.comprar_fracciones(jugador_id, state.sorteo_id, numero_billete, cantidad_fracciones)
 
+    {:reply, resultado, state}
+  end
+
+  @impl true
+  def handle_call({:comprar_completo, jugador_id, numero_billete}, _from, state) do
+    resultado = Compras.comprar_billete_completo(jugador_id, state.sorteo_id, numero_billete)
     {:reply, resultado, state}
   end
 

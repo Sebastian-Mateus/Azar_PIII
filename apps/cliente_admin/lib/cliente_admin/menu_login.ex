@@ -24,9 +24,14 @@ defmodule ClienteAdmin.MenuLogin do
     datos = %{email: email, password: password, tipo_cliente: :admin}
 
     case Cliente.enviar_solicitud(:autenticar, datos) do
-      {:ok, sesion} ->
+      {:ok, %{rol: "ADMINISTRADOR"} = sesion} ->
         IO.puts("\n✓ Bienvenido, #{sesion.first_name} #{sesion.first_lastname}.")
         MenuPrincipal.iniciar(sesion)
+        iniciar()
+
+      {:ok, _otro_rol} ->
+        IO.puts("\n✗ Esta aplicación es solo para administradores.\n")
+        autenticar()
 
       {:error, _motivo} ->
         IO.puts("\n✗ Credenciales inválidas. Intente nuevamente.\n")

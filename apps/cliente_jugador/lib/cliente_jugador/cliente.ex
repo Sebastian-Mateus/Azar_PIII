@@ -1,134 +1,104 @@
 defmodule ClienteJugador.Cliente do
-  @moduledoc "Capa de transporte. Stub para desarrollo del cliente jugador."
+  @moduledoc """
+  Capa de transporte y traducción de contrato.
+  Traduce las operaciones de los menús al protocolo que espera el servidor,
+  y adapta las respuestas al formato que los menús esperan.
+  """
 
-  @usuarios_simulados [
-    %{
-      id: 3,
-      email: "juan@correo.com",
-      password: "jugador123",
-      rol: "JUGADOR",
-      first_name: "Juan",
-      first_lastname: "López"
-    },
-    %{
-      id: 4,
-      email: "maria@correo.com",
-      password: "jugador456",
-      rol: "JUGADOR",
-      first_name: "María",
-      first_lastname: "Gómez"
-    }
-  ]
+  alias ClienteJugador.ClienteTCP
 
   def enviar_solicitud(operacion, datos) do
-    case operacion do
-      :autenticar -> autenticar_simulado(datos)
+    {op_servidor, datos_servidor} = traducir_solicitud(operacion, datos)
 
-      :registrar_jugador ->
-        IO.puts("[STUB] Registrando jugador: #{inspect(datos)}")
-        {:ok, %{
-          id: :rand.uniform(1000) + 100,
-          rol: "JUGADOR",
-          first_name: datos.first_name,
-          first_lastname: datos.first_lastname
-        }}
-
-      :listar_sorteos_disponibles ->
-        {:ok, [
-          %{id: 1, nombre: "Lotería del Quindío", fecha: "2026-05-25",
-            valor_billete: 50_000, num_fracciones: 10, num_billetes: 100},
-          %{id: 2, nombre: "Sorteo de Navidad", fecha: "2026-12-20",
-            valor_billete: 100_000, num_fracciones: 5, num_billetes: 50}
-        ]}
-
-      :consultar_numeros_disponibles ->
-        {:ok, %{
-          billetes_completos: [1001, 1002, 1003, 1005, 1010],
-          fracciones_por_billete: %{
-            1001 => 10, 1002 => 7, 1003 => 3, 1004 => 0, 1005 => 10
-          }
-        }}
-
-      :comprar_billete_completo ->
-        cond do
-          datos.numero_billete == 1004 -> {:error, :billete_no_disponible}
-          true ->
-            {:ok, %{
-              compra_id: :rand.uniform(10000),
-              tipo: :completo,
-              numero: datos.numero_billete,
-              total: 50_000
-            }}
-        end
-
-      :comprar_fracciones ->
-        cond do
-          datos.cant_fracciones > 10 -> {:error, :fracciones_insuficientes}
-          true ->
-            {:ok, %{
-              compra_id: :rand.uniform(10000),
-              tipo: :fracciones,
-              numero: datos.numero_billete,
-              cant_fracciones: datos.cant_fracciones,
-              total: 5_000 * datos.cant_fracciones
-            }}
-        end
-
-      :historial_compras ->
-        {:ok, %{
-          compras: [
-            %{id: 1, sorteo: "Lotería del Quindío", tipo: "Completo",
-              numero: 1001, valor: 50_000, fecha: "2026-05-10"},
-            %{id: 2, sorteo: "Lotería del Quindío", tipo: "Fracciones (3)",
-              numero: 1002, valor: 15_000, fecha: "2026-05-12"}
-          ],
-          total_gastado: 65_000
-        }}
-
-      :devolver_compra ->
-        cond do
-          datos.compra_id == 99 -> {:error, :sorteo_ya_jugado}
-          datos.compra_id == 100 -> {:error, :no_encontrada}
-          true -> {:ok, 50_000}
-        end
-
-      :premios_obtenidos ->
-        {:ok, [
-          %{sorteo: "Lotería de Octubre", premio: "Premio mayor", valor: 5_000_000},
-          %{sorteo: "Sorteo de Febrero", premio: "Segundo premio", valor: 1_000_000}
-        ]}
-
-      :balance_personal ->
-        {:ok, %{gastado: 200_000, ganado: 6_000_000, balance: 5_800_000}}
-
-      :notificaciones ->
-        {:ok, [
-          %{fecha: "2026-05-15", mensaje: "El sorteo Lotería del Quindío ha finalizado."},
-          %{fecha: "2026-05-15", mensaje: "¡Felicitaciones! Ganaste el Premio Mayor."}
-        ]}
-
-      _ ->
-        IO.puts("[STUB] Solicitud: #{operacion} con datos #{inspect(datos)}")
-        {:ok, :stub_response}
-    end
+    op_servidor
+    |> construir_mensaje(datos_servidor)
+    |> ClienteTCP.enviar()
+    |> traducir_respuesta(operacion)
   end
 
-  defp autenticar_simulado(%{email: email, password: password, tipo_cliente: tipo}) do
-    usuario = Enum.find(@usuarios_simulados, fn u ->
-      u.email == email and u.password == password
-    end)
+  # ============================================================
+  # TRADUCCIÓN DE SOLICITUDES (nombre menú -> nombre servidor)
+  # ============================================================
 
-    cond do
-      usuario == nil -> {:error, :credenciales_invalidas}
-      tipo == :jugador and usuario.rol != "JUGADOR" -> {:error, :credenciales_invalidas}
-      true ->
-        sesion = %{
-          id: usuario.id,
-          rol: usuario.rol,
-          first_name: usuario.first_name,
-          first_lastname: usuario.first_lastname
-        }
-        {:ok, sesion}
-    end
+  defp traducir_solicitud(:autenticar, datos),
+    do: {:login, %{email: datos.email, password: datos.password}}
+
+  defp traducir_solicitud(:registrar_jugador, datos),
+    do: {:registrar_usuario, aplanar_registro(datos)}
+
+  defp traducir_solicitud(:historial_compras, datos),
+    do: {:consultar_historial, %{jugador_id: datos.jugador_id}}
+
+  defp traducir_solicitud(:premios_obtenidos, datos),
+    do: {:consultar_premios_obtenidos, %{jugador_id: datos.jugador_id}}
+
+  defp traducir_solicitud(:balance_personal, datos),
+    do: {:consultar_balance_personal, %{jugador_id: datos.jugador_id}}
+
+  defp traducir_solicitud(:notificaciones, datos),
+    do: {:consultar_notificaciones, %{jugador_id: datos.jugador_id}}
+
+  defp traducir_solicitud(:listar_sorteos_disponibles, _datos),
+    do: {:listar_sorteos_abiertos, %{}}
+
+  defp traducir_solicitud(:consultar_disponibilidad_billete, datos),
+    do: {:consultar_disponibilidad_billete, %{sorteo_id: datos.sorteo_id, numero: datos.numero}}
+
+  defp traducir_solicitud(:comprar_billete_completo, datos),
+    do:
+      {:comprar_billete_completo,
+       %{
+         jugador_id: datos.jugador_id,
+         sorteo_id: datos.sorteo_id,
+         numero_billete: datos.numero_billete
+       }}
+
+  defp traducir_solicitud(:comprar_fracciones, datos),
+    do:
+      {:comprar_fracciones,
+       %{
+         jugador_id: datos.jugador_id,
+         sorteo_id: datos.sorteo_id,
+         numero: datos.numero_billete,
+         cantidad: datos.cant_fracciones
+       }}
+
+  defp traducir_solicitud(:devolver_compra, datos),
+    do: {:devolver_compra, %{compra_id: datos.compra_id}}
+
+  # Fallback: pasa tal cual
+  defp traducir_solicitud(op, datos), do: {op, datos}
+
+  # ============================================================
+  # CONSTRUCCIÓN DE MENSAJE FINAL
+  # ============================================================
+
+  defp construir_mensaje(operacion, datos), do: {operacion, datos}
+
+  # ============================================================
+  # TRADUCCIÓN DE RESPUESTAS (formato servidor -> formato menú)
+  # ============================================================
+
+  # El servidor ya entrega el historial con los campos correctos (sorteo, tipo,
+  # numero, valor, fecha), así que no se transforma: se pasa tal cual.
+
+  # Por defecto, retorna la respuesta tal cual
+  defp traducir_respuesta(respuesta, _operacion), do: respuesta
+
+  # ============================================================
+  # HELPERS
+  # ============================================================
+
+  defp aplanar_registro(datos) do
+    %{
+      "cedula" => datos.cedula,
+      "first_name" => datos.first_name,
+      "second_name" => datos.second_name,
+      "first_lastname" => datos.first_lastname,
+      "second_lastname" => datos.second_lastname,
+      "email" => datos.email,
+      "password" => datos.password,
+      "rol" => "JUGADOR"
+    }
   end
 end

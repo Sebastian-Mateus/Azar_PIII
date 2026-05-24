@@ -15,12 +15,29 @@ defmodule ClienteAdmin.MenuSorteos do
     UI.opcion(6, "Volver al menú principal")
 
     case Entrada.leer_opcion("Opción: ", [1, 2, 3, 4, 5, 6]) do
-      1 -> crear_sorteo(sesion); iniciar(sesion)
-      2 -> listar_sorteos(); iniciar(sesion)
-      3 -> eliminar_sorteo(); iniciar(sesion)
-      4 -> consultar_clientes(); iniciar(sesion)
-      5 -> consultar_ingresos(); iniciar(sesion)
-      6 -> :ok  # retorna sin recursión → vuelve al menú principal
+      1 ->
+        crear_sorteo(sesion)
+        iniciar(sesion)
+
+      2 ->
+        listar_sorteos()
+        iniciar(sesion)
+
+      3 ->
+        eliminar_sorteo()
+        iniciar(sesion)
+
+      4 ->
+        consultar_clientes()
+        iniciar(sesion)
+
+      5 ->
+        consultar_ingresos()
+        iniciar(sesion)
+
+      # retorna sin recursión → vuelve al menú principal
+      6 ->
+        :ok
     end
   end
 
@@ -68,7 +85,7 @@ defmodule ClienteAdmin.MenuSorteos do
   end
 
   defp imprimir_sorteo(s) do
-    UI.info("• #{s[:nombre]} (#{s[:fecha]}) — Estado: #{s[:estado]}")
+    UI.info("• [ID: #{s[:id]}] #{s[:nombre]} (#{s[:fecha_juego]}) — Estado: #{s[:estado]}")
   end
 
   # ----- Opción 3: Eliminar sorteo -----
@@ -99,6 +116,7 @@ defmodule ClienteAdmin.MenuSorteos do
     case Cliente.enviar_solicitud(:consultar_clientes_sorteo, %{sorteo_id: id}) do
       {:ok, %{completo: completos, fracciones: fraccionarios}} ->
         UI.info("\nCompradores de billete completo:")
+
         if completos == [] do
           UI.aviso("  (Ninguno)")
         else
@@ -106,6 +124,7 @@ defmodule ClienteAdmin.MenuSorteos do
         end
 
         UI.info("\nCompradores por fracción:")
+
         if fraccionarios == [] do
           UI.aviso("  (Ninguno)")
         else
