@@ -365,4 +365,35 @@ defmodule ServidorCentral.SorteosC do
 
     Repo.all(query)
   end
+
+  @doc """
+  Obtiene los ganadores de un sorteo: para cada premio con número ganador,
+  busca qué jugador compró el billete correspondiente.
+  Retorna una lista de mapas con nombre del ganador y nombre del premio.
+  """
+  def obtener_ganadores_sorteo(sorteo_id) do
+    query =
+      from(p in Premio,
+        join: d in DetalleCompra,
+        on: d.sorteo_id == p.sorteo_id and d.numero_billete == p.numero_ganador,
+        join: c in ServidorCentral.Compra,
+        on: c.id == d.compra_id,
+        join: u in ServidorCentral.Usuario,
+        on: u.id == c.usuario_id,
+        where: p.sorteo_id == ^sorteo_id and not is_nil(p.numero_ganador),
+        select: %{
+          nombre_ganador: u.first_name,
+          apellido_ganador: u.first_lastname,
+          nombre_premio: p.nombre
+        }
+      )
+
+    Repo.all(query)
+    |> Enum.map(fn g ->
+      %{
+        nombre_ganador: "#{g.nombre_ganador} #{g.apellido_ganador}",
+        nombre_premio: g.nombre_premio
+      }
+    end)
+  end
 end

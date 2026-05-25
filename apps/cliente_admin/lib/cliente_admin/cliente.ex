@@ -1,188 +1,116 @@
 defmodule ClienteAdmin.Cliente do
   @moduledoc """
-  Capa de transporte. Único módulo que comunica con el servidor.
-
-  Hoy: stub local que simula respuestas del servidor.
-  Mañana: abre socket TCP y envía solicitudes serializadas.
+  Capa de transporte y traducción de contrato para el administrador.
+  Traduce las operaciones de los menús al protocolo que espera el servidor
+  y adapta las respuestas al formato que los menús esperan.
   """
 
-  # ----- BASE DE DATOS SIMULADA (solo para desarrollo) -----
-  @usuarios_simulados [
-    %{
-      id: 1,
-      email: "carlos@correo.com",
-      password: "admin123",
-      rol: "ADMINISTRADOR",
-      first_name: "Carlos",
-      first_lastname: "Pérez"
-    },
-    %{
-      id: 2,
-      email: "ana@correo.com",
-      password: "admin456",
-      rol: "ADMINISTRADOR",
-      first_name: "Ana",
-      first_lastname: "Ramírez"
-    },
-    %{
-      id: 3,
-      email: "juan@correo.com",
-      password: "jugador123",
-      rol: "JUGADOR",
-      first_name: "Juan",
-      first_lastname: "López"
-    }
-  ]
+  alias ClienteAdmin.ClienteTCP
 
   def enviar_solicitud(operacion, datos) do
-    case operacion do
-      :autenticar ->
-        autenticar_simulado(datos)
+    {op_servidor, datos_servidor} = traducir_solicitud(operacion, datos)
 
-      # ----- SORTEOS -----
-      :crear_sorteo ->
-        IO.puts("[STUB] Creando sorteo: #{inspect(datos)}")
-        {:ok, %{id: :rand.uniform(1000), nombre: datos.nombre}}
-
-      :listar_sorteos ->
-        {:ok, [
-          %{id: 1, nombre: "Lotería del Quindío", fecha: "2026-05-25", estado: "ACTIVO"},
-          %{id: 2, nombre: "Sorteo de Navidad", fecha: "2026-12-20", estado: "PENDIENTE"},
-          %{id: 3, nombre: "Lotería de Año Nuevo", fecha: "2026-01-01", estado: "FINALIZADO"}
-        ]}
-
-      :eliminar_sorteo ->
-        cond do
-          datos.sorteo_id == 1 -> {:error, :tiene_premios}
-          datos.sorteo_id == 99 -> {:error, :no_encontrado}
-          true -> {:ok, :eliminado}
-        end
-
-      :consultar_clientes_sorteo ->
-        {:ok, %{
-          completo: ["Ana Ramírez", "Carlos Pérez"],
-          fracciones: ["Juan López", "María Gómez", "Pedro Silva"]
-        }}
-
-      :consultar_ingresos_sorteo ->
-        {:ok, 1_250_000}
-
-      # ----- PREMIOS -----
-      :crear_premio ->
-        cond do
-          datos.sorteo_id == 99 -> {:error, :sorteo_no_encontrado}
-          datos.sorteo_id == 3 -> {:error, :sorteo_ya_jugado}
-          true ->
-            IO.puts("[STUB] Creando premio: #{inspect(datos)}")
-            {:ok, %{id: :rand.uniform(1000), nombre: datos.nombre, valor: datos.valor}}
-        end
-
-      :listar_premios ->
-        {:ok, [
-          %{
-            id: 1,
-            nombre: "Lotería del Quindío",
-            fecha: "2026-05-25",
-            premios: [
-              %{id: 10, nombre: "Premio mayor", valor: 5_000_000},
-              %{id: 11, nombre: "Segundo premio", valor: 2_000_000}
-            ]
-          },
-          %{
-            id: 2,
-            nombre: "Sorteo de Navidad",
-            fecha: "2026-12-20",
-            premios: [
-              %{id: 20, nombre: "Premio único", valor: 10_000_000}
-            ]
-          },
-          %{
-            id: 3,
-            nombre: "Lotería de Año Nuevo",
-            fecha: "2026-01-01",
-            premios: []
-          }
-        ]}
-
-      :eliminar_premio ->
-        cond do
-          datos.premio_id == 10 -> {:error, :tiene_clientes}
-          datos.premio_id == 99 -> {:error, :no_encontrado}
-          true -> {:ok, :eliminado}
-        end
-
-      # ----- REPORTES -----
-      :consultar_premios_entregados ->
-        {:ok, [
-          %{
-            nombre: "Lotería de Año Nuevo",
-            fecha: "2026-01-01",
-            dinero_recolectado: 8_500_000,
-            total_premios_entregados: 5_000_000,
-            ganadores: [
-              %{nombre_ganador: "Juan López", nombre_premio: "Premio mayor"},
-              %{nombre_ganador: "María Gómez", nombre_premio: "Segundo premio"}
-            ]
-          },
-          %{
-            nombre: "Sorteo de Octubre",
-            fecha: "2025-10-15",
-            dinero_recolectado: 3_000_000,
-            total_premios_entregados: 4_500_000,
-            ganadores: [
-              %{nombre_ganador: "Pedro Silva", nombre_premio: "Premio único"}
-            ]
-          }
-        ]}
-
-      :consultar_balance_general ->
-        {:ok, %{
-          por_sorteo: [
-            %{nombre: "Lotería de Año Nuevo", resultado: 3_500_000},
-            %{nombre: "Sorteo de Octubre", resultado: -1_500_000}
-          ],
-          total_acumulado: 2_000_000
-        }}
-
-      # ----- FECHA DEL SISTEMA -----
-      :actualizar_fecha_sistema ->
-        cond do
-          Date.compare(datos.nueva_fecha, ~D[2026-05-01]) == :lt ->
-            {:error, :fecha_anterior_actual}
-          true ->
-            {:ok, %{sorteos_jugados: :rand.uniform(3)}}
-        end
-
-      # ----- FALLBACK (siempre al final) -----
-      _ ->
-        IO.puts("[STUB] Solicitud enviada: #{operacion} con datos #{inspect(datos)}")
-        {:ok, :stub_response}
-    end
+    op_servidor
+    |> construir_mensaje(datos_servidor)
+    |> ClienteTCP.enviar()
+    |> traducir_respuesta(operacion)
   end
 
-  defp autenticar_simulado(%{email: email, password: password, tipo_cliente: tipo}) do
-    usuario = Enum.find(@usuarios_simulados, fn u ->
-      u.email == email and u.password == password
-    end)
+  # ============================================================
+  # TRADUCCIÓN DE SOLICITUDES
+  # ============================================================
 
-    cond do
-      usuario == nil ->
-        {:error, :credenciales_invalidas}
+  defp traducir_solicitud(:autenticar, datos),
+    do: {:login, %{email: datos.email, password: datos.password}}
 
-      tipo == :admin and usuario.rol != "ADMINISTRADOR" ->
-        {:error, :credenciales_invalidas}
+  # El menú manda los campos del sorteo sueltos + id_admin.
+  # El servidor espera %{usuario_id, datos: %{...con claves string...}}.
+  defp traducir_solicitud(:crear_sorteo, datos) do
+    payload = %{
+      usuario_id: datos.id_admin,
+      datos: %{
+        "nombre" => datos.nombre,
+        "estado" => "ABIERTO",
+        "valor_billete" => to_string(datos.valor_billete),
+        "num_fracciones" => datos.num_fracciones,
+        "num_billetes" => datos.num_billetes,
+        "fecha_juego" => datos.fecha
+      }
+    }
 
-      tipo == :jugador and usuario.rol != "JUGADOR" ->
-        {:error, :credenciales_invalidas}
-
-      true ->
-        sesion = %{
-          id: usuario.id,
-          rol: usuario.rol,
-          first_name: usuario.first_name,
-          first_lastname: usuario.first_lastname
-        }
-        {:ok, sesion}
-    end
+    {:crear_sorteo, payload}
   end
+
+  defp traducir_solicitud(:listar_sorteos, _datos),
+    do: {:listar_sorteos, %{}}
+
+  defp traducir_solicitud(:eliminar_sorteo, datos),
+    do: {:eliminar_sorteo, %{id: datos.sorteo_id}}
+
+  defp traducir_solicitud(:consultar_clientes_sorteo, datos),
+    do: {:consultar_clientes_sorteo, %{sorteo_id: datos.sorteo_id}}
+
+  defp traducir_solicitud(:consultar_ingresos_sorteo, datos),
+    do: {:consultar_ingresos, %{sorteo_id: datos.sorteo_id}}
+
+  # Premios
+  defp traducir_solicitud(:crear_premio, datos) do
+    payload = %{
+      sorteo_id: datos.sorteo_id,
+      datos: %{
+        "nombre" => datos.nombre,
+        "valor" => to_string(datos.valor)
+      }
+    }
+
+    {:crear_premio, payload}
+  end
+
+  defp traducir_solicitud(:listar_premios, _datos),
+    do: {:listar_premios, %{}}
+
+  defp traducir_solicitud(:eliminar_premio, datos),
+    do: {:eliminar_premio, %{id: datos.premio_id}}
+
+  # Reportes
+  defp traducir_solicitud(:consultar_premios_entregados, _datos),
+    do: {:consultar_premios_entregados, %{}}
+
+  defp traducir_solicitud(:consultar_balance_general, _datos),
+    do: {:consultar_balance_global, %{}}
+
+  # Fecha del sistema
+  defp traducir_solicitud(:actualizar_fecha_sistema, datos),
+    do: {:actualizar_fecha, %{fecha: datos.nueva_fecha}}
+
+  # Fallback
+  defp traducir_solicitud(op, datos), do: {op, datos}
+
+  # ============================================================
+  # CONSTRUCCIÓN DEL MENSAJE
+  # ============================================================
+
+  defp construir_mensaje(operacion, datos), do: {operacion, datos}
+
+  # ============================================================
+  # TRADUCCIÓN DE RESPUESTAS
+  # ============================================================
+
+  # crear_sorteo: el servidor devuelve {:ok, %Sorteo{}} ya serializado a mapa.
+  # El menú lee sorteo[:id], que ya viene en el mapa. No requiere cambios.
+
+  # eliminar_sorteo: el servidor devuelve {:ok, %Sorteo{}} (el borrado).
+  # El menú espera {:ok, :eliminado}.
+  defp traducir_respuesta({:ok, _struct}, :eliminar_sorteo), do: {:ok, :eliminado}
+
+  # eliminar_premio: igual que arriba.
+  defp traducir_respuesta({:ok, _struct}, :eliminar_premio), do: {:ok, :eliminado}
+
+  # actualizar_fecha: el servidor devuelve {:ok, lista_de_resultados}.
+  # El menú espera {:ok, %{sorteos_jugados: n}}.
+  defp traducir_respuesta({:ok, lista}, :actualizar_fecha_sistema) when is_list(lista),
+    do: {:ok, %{sorteos_jugados: length(lista)}}
+
+  # Por defecto, sin cambios.
+  defp traducir_respuesta(respuesta, _operacion), do: respuesta
 end

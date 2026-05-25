@@ -12,9 +12,16 @@ defmodule ClienteAdmin.MenuReportes do
     UI.opcion(3, "Volver al menú principal")
 
     case Entrada.leer_opcion("Opción: ", [1, 2, 3]) do
-      1 -> premios_entregados(); iniciar(sesion)
-      2 -> balance_general(); iniciar(sesion)
-      3 -> :ok
+      1 ->
+        premios_entregados()
+        iniciar(sesion)
+
+      2 ->
+        balance_general()
+        iniciar(sesion)
+
+      3 ->
+        :ok
     end
   end
 
@@ -24,7 +31,7 @@ defmodule ClienteAdmin.MenuReportes do
 
     case Cliente.enviar_solicitud(:consultar_premios_entregados, %{}) do
       {:ok, []} ->
-        UI.aviso("Aún no hay sorteos finalizados.")
+        UI.aviso("No hay premios con ganadores asociados.")
 
       {:ok, sorteos} when is_list(sorteos) ->
         Enum.each(sorteos, &imprimir_resumen_sorteo/1)
@@ -39,12 +46,14 @@ defmodule ClienteAdmin.MenuReportes do
     UI.info("  Dinero recolectado: $#{s[:dinero_recolectado]}")
     UI.info("  Total premios entregados: $#{s[:total_premios_entregados]}")
 
-    resultado = (s[:dinero_recolectado] || 0) - (s[:total_premios_entregados] || 0)
+    recolectado = to_decimal(s[:dinero_recolectado])
+    entregado = to_decimal(s[:total_premios_entregados])
+    resultado = Decimal.sub(recolectado, entregado)
 
-    if resultado >= 0 do
+    if Decimal.compare(resultado, Decimal.new(0)) != :lt do
       UI.exito("  Ganancia: $#{resultado}")
     else
-      UI.error("  Pérdida: $#{abs(resultado)}")
+      UI.error("  Pérdida: $#{Decimal.abs(resultado)}")
     end
 
     UI.info("  Ganadores:")
@@ -79,16 +88,22 @@ defmodule ClienteAdmin.MenuReportes do
         end
 
         UI.info("")
-        total = balance[:total_acumulado] || 0
+        total = to_decimal(balance[:total_acumulado])
 
-        if total >= 0 do
+        if Decimal.compare(total, Decimal.new(0)) != :lt do
           UI.exito("Total acumulado: ganancia de $#{total}")
         else
-          UI.error("Total acumulado: pérdida de $#{abs(total)}")
+          UI.error("Total acumulado: pérdida de $#{Decimal.abs(total)}")
         end
 
       {:error, motivo} ->
         UI.error("No se pudo generar el balance: #{inspect(motivo)}")
     end
   end
+
+  # Convierte valores a Decimal de forma segura (acepta Decimal, entero o nil).
+  defp to_decimal(nil), do: Decimal.new(0)
+  defp to_decimal(%Decimal{} = d), do: d
+  defp to_decimal(n) when is_integer(n), do: Decimal.new(n)
+  defp to_decimal(n) when is_float(n), do: Decimal.from_float(n)
 end

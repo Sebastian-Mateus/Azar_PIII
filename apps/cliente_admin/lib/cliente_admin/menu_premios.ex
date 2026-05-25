@@ -13,10 +13,20 @@ defmodule ClienteAdmin.MenuPremios do
     UI.opcion(4, "Volver al menú principal")
 
     case Entrada.leer_opcion("Opción: ", [1, 2, 3, 4]) do
-      1 -> crear_premio(); iniciar(sesion)
-      2 -> listar_premios(); iniciar(sesion)
-      3 -> eliminar_premio(); iniciar(sesion)
-      4 -> :ok
+      1 ->
+        crear_premio()
+        iniciar(sesion)
+
+      2 ->
+        listar_premios()
+        iniciar(sesion)
+
+      3 ->
+        eliminar_premio()
+        iniciar(sesion)
+
+      4 ->
+        :ok
     end
   end
 
@@ -71,7 +81,15 @@ defmodule ClienteAdmin.MenuPremios do
 
       premios ->
         Enum.each(premios, fn p ->
-          UI.info("    • #{p[:nombre]} — $#{p[:valor]}")
+          ganador =
+            case p[:numero_ganador] do
+              nil -> "pendiente"
+              n -> "Nº #{n}"
+            end
+
+          UI.info(
+            "    • [ID: #{p[:id]}] #{p[:nombre]} — $#{p[:valor]} — Ganador: #{ganador} — Estado: #{p[:estado]}"
+          )
         end)
     end
   end

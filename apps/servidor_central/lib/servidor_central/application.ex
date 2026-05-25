@@ -10,7 +10,9 @@ defmodule ServidorCentral.Application do
     children = [
       ServidorCentral.Repo,
       {Registry, keys: :unique, name: ServidorCentral.RegistroSorteos},
-      ServidorCentral.SupervisorSorteos
+      ServidorCentral.SupervisorSorteos,
+      {Task.Supervisor, name: ServidorCentral.SupervisorConexiones},
+      ServidorCentral.ServidorTCP
       # Starts a worker by calling: ServidorCentral.Worker.start_link(arg)
       # {ServidorCentral.Worker, arg}
     ]

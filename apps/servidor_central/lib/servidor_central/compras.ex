@@ -21,36 +21,99 @@ defmodule ServidorCentral.Compras do
          {:ok, billete} <- obtener_o_crear_billete(numero_billete, sorteo),
          :ok <- validar_disponibilidad(billete, cantidad_fracciones),
          subtotal <- calcular_subtotal(sorteo, cantidad_fracciones) do
-      Repo.transaction(fn ->
-        {:ok, compra} =
-          %Compra{}
-          |> Compra.changeset(%{
-            "usuario_id" => jugador_id,
-            "fecha" => Date.utc_today(),
-            "total" => subtotal
-          })
-          |> Repo.insert()
+      resultado =
+        Repo.transaction(fn ->
+          {:ok, compra} =
+            %Compra{}
+            |> Compra.changeset(%{
+              "usuario_id" => jugador_id,
+              "fecha" => Date.utc_today(),
+              "total" => subtotal
+            })
+            |> Repo.insert()
 
-        {:ok, _detalle} =
-          %DetalleCompra{}
-          |> DetalleCompra.changeset(%{
-            "sorteo_id" => sorteo_id,
-            "numero_billete" => numero_billete,
-            "compra_id" => compra.id,
-            "num_fracciones" => cantidad_fracciones,
-            "subtotal" => subtotal
-          })
-          |> Repo.insert()
+          {:ok, _detalle} =
+            %DetalleCompra{}
+            |> DetalleCompra.changeset(%{
+              "sorteo_id" => sorteo_id,
+              "numero_billete" => numero_billete,
+              "compra_id" => compra.id,
+              "num_fracciones" => cantidad_fracciones,
+              "subtotal" => subtotal
+            })
+            |> Repo.insert()
 
-        nuevas_fracciones = billete.fracciones_disponibles - cantidad_fracciones
+          nuevas_fracciones = billete.fracciones_disponibles - cantidad_fracciones
 
-        {:ok, _billete} =
-          billete
-          |> Billete.changeset(%{"fracciones_disponibles" => nuevas_fracciones})
-          |> Repo.update()
+          {:ok, _billete} =
+            billete
+            |> Billete.changeset(%{"fracciones_disponibles" => nuevas_fracciones})
+            |> Repo.update()
 
-        compra
-      end)
+          compra
+        end)
+
+      case resultado do
+        {:ok, compra} ->
+          {:ok,
+           %{
+             compra_id: compra.id,
+             numero: numero_billete,
+             cant_fracciones: cantidad_fracciones,
+             total: subtotal
+           }}
+
+        error ->
+          error
+      end
+    end
+  end
+
+  @doc """
+  Compra un billete completo, es decir, todas las fracciones del billete.
+  """
+  def comprar_billete_completo(jugador_id, sorteo_id, numero_billete) do
+    case Repo.get(Sorteo, sorteo_id) do
+      nil ->
+        {:error, :sorteo_no_encontrado}
+
+      sorteo ->
+        comprar_fracciones(jugador_id, sorteo_id, numero_billete, sorteo.num_fracciones)
+    end
+  end
+
+  @doc """
+  Consulta cuántas fracciones tiene disponibles un billete específico de un sorteo.
+  """
+  def consultar_disponibilidad_billete(sorteo_id, numero_billete) do
+    case Repo.get(Sorteo, sorteo_id) do
+      nil ->
+        {:error, :sorteo_no_encontrado}
+
+      sorteo ->
+        cond do
+          numero_billete < 0 or numero_billete >= sorteo.num_billetes ->
+            {:error, :numero_fuera_de_rango}
+
+          true ->
+            case Repo.get_by(Billete, numero: numero_billete, sorteo_id: sorteo_id) do
+              nil ->
+                {:ok,
+                 %{
+                   numero: numero_billete,
+                   fracciones_disponibles: sorteo.num_fracciones,
+                   total: sorteo.num_fracciones
+                 }}
+
+              billete ->
+                {:ok,
+                 %{
+                   numero: numero_billete,
+                   fracciones_disponibles: billete.fracciones_disponibles,
+                   total: sorteo.num_fracciones
+                 }}
+            end
+        end
     end
   end
 
@@ -153,15 +216,45 @@ defmodule ServidorCentral.Compras do
   Consulta el historial de compras de un jugador con su total gastado.
   """
   def consultar_historial(jugador_id) do
-    compras =
-      Compra
-      |> where([c], c.usuario_id == ^jugador_id)
-      |> order_by([c], desc: c.fecha)
-      |> Repo.all()
+    query =
+      from(c in Compra,
+        join: d in DetalleCompra,
+        on: d.compra_id == c.id,
+        join: s in Sorteo,
+        on: s.id == d.sorteo_id,
+        where: c.usuario_id == ^jugador_id,
+        order_by: [desc: c.fecha],
+        select: %{
+          id: c.id,
+          sorteo: s.nombre,
+          numero: d.numero_billete,
+          num_fracciones: d.num_fracciones,
+          total_fracciones: s.num_fracciones,
+          valor: d.subtotal,
+          fecha: c.fecha
+        }
+      )
 
-    total = Enum.reduce(compras, Decimal.new(0), fn c, acc -> Decimal.add(acc, c.total) end)
+    registros = Repo.all(query)
 
-    %{compras: compras, total_gastado: total}
+    compras_adaptadas =
+      Enum.map(registros, fn r ->
+        tipo =
+          if r.num_fracciones == r.total_fracciones, do: "Billete completo", else: "Fracciones"
+
+        %{
+          id: r.id,
+          sorteo: r.sorteo,
+          tipo: tipo,
+          numero: r.numero,
+          valor: r.valor,
+          fecha: r.fecha
+        }
+      end)
+
+    total = Enum.reduce(registros, Decimal.new(0), fn r, acc -> Decimal.add(acc, r.valor) end)
+
+    %{compras: compras_adaptadas, total_gastado: total}
   end
 
   @doc """

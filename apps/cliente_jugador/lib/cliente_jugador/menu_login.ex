@@ -26,6 +26,7 @@ defmodule ClienteJugador.MenuLogin do
       {:ok, sesion} ->
         UI.exito("Bienvenido, #{sesion.first_name} #{sesion.first_lastname}.")
         MenuPrincipal.iniciar(sesion)
+        iniciar()
 
       {:error, _} ->
         UI.error("Credenciales inválidas.")
