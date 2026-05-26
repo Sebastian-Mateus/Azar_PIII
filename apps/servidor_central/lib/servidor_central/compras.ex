@@ -16,7 +16,8 @@ defmodule ServidorCentral.Compras do
   Valida que el sorteo esté ABIERTO y que haya fracciones suficientes.
   """
   def comprar_fracciones(jugador_id, sorteo_id, numero_billete, cantidad_fracciones) do
-    with {:ok, sorteo} <- buscar_sorteo_abierto(sorteo_id),
+    with :ok <- validar_tiene_tarjeta(jugador_id),
+         {:ok, sorteo} <- buscar_sorteo_abierto(sorteo_id),
          :ok <- validar_numero_billete(numero_billete, sorteo),
          {:ok, billete} <- obtener_o_crear_billete(numero_billete, sorteo),
          :ok <- validar_disponibilidad(billete, cantidad_fracciones),
@@ -154,6 +155,14 @@ defmodule ServidorCentral.Compras do
       :ok
     else
       {:error, :fracciones_insuficientes}
+    end
+  end
+
+  defp validar_tiene_tarjeta(jugador_id) do
+    if ServidorCentral.Cuentas.tiene_tarjeta?(jugador_id) do
+      :ok
+    else
+      {:error, :sin_tarjeta}
     end
   end
 

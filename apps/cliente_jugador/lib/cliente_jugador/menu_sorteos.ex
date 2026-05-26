@@ -102,6 +102,9 @@ defmodule ClienteJugador.MenuSorteos do
         UI.info("  Billete: #{compra[:numero]}")
         UI.info("  Total pagado: $#{compra[:total]}")
 
+      {:error, :sin_tarjeta} ->
+        UI.error("Debes registrar una tarjeta de crédito antes de comprar. Ve a 'Mi cuenta'.")
+
       {:error, :sorteo_no_disponible} ->
         UI.error("El sorteo no está abierto para compras.")
 
@@ -132,6 +135,9 @@ defmodule ClienteJugador.MenuSorteos do
         UI.info("  ID de compra: #{compra[:compra_id]}")
         UI.info("  Billete: #{compra[:numero]}, fracciones: #{compra[:cant_fracciones]}")
         UI.info("  Total pagado: $#{compra[:total]}")
+
+      {:error, :sin_tarjeta} ->
+        UI.error("Debes registrar una tarjeta de crédito antes de comprar. Ve a 'Mi cuenta'.")
 
       {:error, :sorteo_no_disponible} ->
         UI.error("El sorteo no está abierto para compras.")

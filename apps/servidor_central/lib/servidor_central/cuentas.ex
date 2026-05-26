@@ -4,7 +4,7 @@ defmodule ServidorCentral.Cuentas do
   Expone las operaciones de registro, autenticación y consulta de usuarios.
   """
 
-  alias ServidorCentral.{Repo, Usuario}
+  alias ServidorCentral.{Repo, Usuario, Tarjeta, ClienteTarjeta}
   import Ecto.Query
 
   @doc """
@@ -92,5 +92,37 @@ defmodule ServidorCentral.Cuentas do
       {:ok, usuario} -> Repo.delete(usuario)
       error -> error
     end
+  end
+
+  @doc """
+  Registra una tarjeta y la asocia a un usuario.
+  """
+  def agregar_tarjeta(usuario_id, params_tarjeta) do
+    Repo.transaction(fn ->
+      {:ok, tarjeta} =
+        %Tarjeta{}
+        |> Tarjeta.changeset(params_tarjeta)
+        |> Repo.insert()
+
+      {:ok, _asociacion} =
+        %ClienteTarjeta{}
+        |> ClienteTarjeta.changeset(%{usuario_id: usuario_id, tarjeta_id: tarjeta.id})
+        |> Repo.insert()
+
+      tarjeta
+    end)
+  end
+
+  @doc """
+  Verifica si un usuario tiene al menos una tarjeta registrada.
+  """
+  def tiene_tarjeta?(usuario_id) do
+    query =
+      from(ct in ClienteTarjeta,
+        where: ct.usuario_id == ^usuario_id,
+        limit: 1
+      )
+
+    Repo.exists?(query)
   end
 end

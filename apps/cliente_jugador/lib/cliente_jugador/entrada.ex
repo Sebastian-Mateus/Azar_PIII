@@ -3,22 +3,41 @@ defmodule ClienteJugador.Entrada do
 
   def leer_texto(mensaje) do
     case IO.gets(mensaje) |> String.trim() do
-      "" -> IO.puts(" El valor no puede estar vacío."); leer_texto(mensaje)
+      "" ->
+        IO.puts(" El valor no puede estar vacío.")
+        leer_texto(mensaje)
+
+      texto ->
+        texto
+    end
+  end
+
+  def leer_texto_opcional(mensaje) do
+    case IO.gets(mensaje) |> String.trim() do
+      "" -> nil
       texto -> texto
     end
   end
 
   def leer_entero(mensaje) do
     case Integer.parse(IO.gets(mensaje) |> String.trim()) do
-      {numero, ""} -> numero
-      _ -> IO.puts(" Debe ingresar un número entero válido."); leer_entero(mensaje)
+      {numero, ""} ->
+        numero
+
+      _ ->
+        IO.puts(" Debe ingresar un número entero válido.")
+        leer_entero(mensaje)
     end
   end
 
   def leer_decimal(mensaje) do
     case Float.parse(IO.gets(mensaje) |> String.trim()) do
-      {numero, ""} -> numero
-      _ -> IO.puts(" Debe ingresar un número decimal válido."); leer_decimal(mensaje)
+      {numero, ""} ->
+        numero
+
+      _ ->
+        IO.puts(" Debe ingresar un número decimal válido.")
+        leer_decimal(mensaje)
     end
   end
 
@@ -31,6 +50,7 @@ defmodule ClienteJugador.Entrada do
           IO.puts(" Opción no válida. Elija una de: #{Enum.join(opciones_validas, ", ")}.")
           leer_opcion(mensaje, opciones_validas)
         end
+
       _ ->
         IO.puts("Debe ingresar un número.")
         leer_opcion(mensaje, opciones_validas)
@@ -54,6 +74,7 @@ defmodule ClienteJugador.Entrada do
     case Integer.parse(entrada) do
       {_, ""} when byte_size(entrada) >= 6 and byte_size(entrada) <= 12 ->
         entrada
+
       _ ->
         IO.puts("Cédula inválida (debe ser numérica, 6-12 dígitos).")
         leer_cedula(mensaje)
@@ -66,6 +87,7 @@ defmodule ClienteJugador.Entrada do
     case Integer.parse(entrada) do
       {_, ""} when byte_size(entrada) == 16 ->
         entrada
+
       _ ->
         IO.puts("Número de tarjeta inválido (debe tener 16 dígitos).")
         leer_numero_tarjeta(mensaje)
@@ -78,6 +100,7 @@ defmodule ClienteJugador.Entrada do
     case Integer.parse(entrada) do
       {_, ""} when byte_size(entrada) == 3 ->
         entrada
+
       _ ->
         IO.puts("CVC inválido (debe tener 3 dígitos).")
         leer_cvc(mensaje)

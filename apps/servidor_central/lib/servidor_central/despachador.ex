@@ -32,6 +32,17 @@ defmodule ServidorCentral.Despachador do
     {:ok, Enum.map(Cuentas.listar_por_rol(rol), &serializar_usuario/1)}
   end
 
+  def despachar({:agregar_tarjeta, %{usuario_id: id, tarjeta: tarjeta}}) do
+    case ServidorCentral.Cuentas.agregar_tarjeta(id, tarjeta) do
+      {:ok, t} -> {:ok, %{id: t.id, numero: t.numero}}
+      error -> error
+    end
+  end
+
+  def despachar({:tiene_tarjeta, %{usuario_id: id}}) do
+    {:ok, ServidorCentral.Cuentas.tiene_tarjeta?(id)}
+  end
+
   # ============================================================
   # SORTEOS
   # ============================================================

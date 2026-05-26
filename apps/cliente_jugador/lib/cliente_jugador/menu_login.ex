@@ -40,17 +40,11 @@ defmodule ClienteJugador.MenuLogin do
     datos = %{
       cedula: Entrada.leer_cedula("Cédula: "),
       first_name: Entrada.leer_texto("Primer nombre: "),
-      second_name: Entrada.leer_texto("Segundo nombre: "),
+      second_name: Entrada.leer_texto_opcional("Segundo nombre: "),
       first_lastname: Entrada.leer_texto("Primer apellido: "),
       second_lastname: Entrada.leer_texto("Segundo apellido: "),
       email: Entrada.leer_email("Email: "),
-      password: Entrada.leer_texto("Contraseña: "),
-      tarjeta: %{
-        numero: Entrada.leer_numero_tarjeta("Número de tarjeta (16 dígitos): "),
-        fecha_mes: Entrada.leer_entero("Mes de vencimiento (1-12): "),
-        fecha_ano: Entrada.leer_entero("Año de vencimiento (ej: 2028): "),
-        cvc: Entrada.leer_cvc("CVC (3 dígitos): ")
-      }
+      password: Entrada.leer_texto("Contraseña: ")
     }
 
     case Cliente.enviar_solicitud(:registrar_jugador, datos) do

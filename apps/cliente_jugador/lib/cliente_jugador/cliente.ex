@@ -20,6 +20,9 @@ defmodule ClienteJugador.Cliente do
   # TRADUCCIÓN DE SOLICITUDES (nombre menú -> nombre servidor)
   # ============================================================
 
+  defp traducir_solicitud(:agregar_tarjeta, datos),
+    do: {:agregar_tarjeta, %{usuario_id: datos.usuario_id, tarjeta: datos.tarjeta}}
+
   defp traducir_solicitud(:autenticar, datos),
     do: {:login, %{email: datos.email, password: datos.password}}
 

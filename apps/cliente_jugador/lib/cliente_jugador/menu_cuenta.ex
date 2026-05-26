@@ -12,7 +12,7 @@ defmodule ClienteJugador.MenuCuenta do
     UI.opcion(5, "Notificaciones")
     UI.opcion(6, "Volver al menú principal")
 
-    case Entrada.leer_opcion("Opción: ", [1, 2, 3, 4, 5, 6]) do
+    case Entrada.leer_opcion("Opción: ", [1, 2, 3, 4, 5, 6, 7]) do
       1 ->
         historial(sesion)
         iniciar(sesion)
@@ -34,6 +34,10 @@ defmodule ClienteJugador.MenuCuenta do
         iniciar(sesion)
 
       6 ->
+        agregar_tarjeta(sesion)
+        iniciar(sesion)
+
+      7 ->
         :ok
     end
   end
@@ -79,6 +83,21 @@ defmodule ClienteJugador.MenuCuenta do
 
       {:error, motivo} ->
         UI.error("No se pudo devolver: #{inspect(motivo)}")
+    end
+  end
+
+  defp agregar_tarjeta(sesion) do
+    UI.titulo("Agregar tarjeta de crédito")
+
+    tarjeta = %{
+      "numero" => Entrada.leer_numero_tarjeta("Número de tarjeta (16 dígitos): "),
+      "fecha_vencimiento" => Entrada.leer_texto("Fecha de vencimiento (MM/YY): "),
+      "cvc" => Entrada.leer_cvc("CVC (3 dígitos): ")
+    }
+
+    case Cliente.enviar_solicitud(:agregar_tarjeta, %{usuario_id: sesion.id, tarjeta: tarjeta}) do
+      {:ok, _} -> UI.exito("Tarjeta registrada correctamente.")
+      {:error, motivo} -> UI.error("No se pudo registrar la tarjeta: #{inspect(motivo)}")
     end
   end
 
