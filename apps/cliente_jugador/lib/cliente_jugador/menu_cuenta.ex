@@ -10,7 +10,8 @@ defmodule ClienteJugador.MenuCuenta do
     UI.opcion(3, "Premios obtenidos")
     UI.opcion(4, "Balance personal")
     UI.opcion(5, "Notificaciones")
-    UI.opcion(6, "Volver al menú principal")
+    UI.opcion(6, "Agregar Tarjeta de Credito")
+    UI.opcion(7, "Volver al menú principal")
 
     case Entrada.leer_opcion("Opción: ", [1, 2, 3, 4, 5, 6, 7]) do
       1 ->
